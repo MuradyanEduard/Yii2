@@ -8,8 +8,8 @@ use yii\widgets\DetailView;
 
 ?>
 
-<div class="show_cart" style="position:fixed; z-index: 9999; right: 0; cursor:pointer; top: 10%; width: 60px; border-radius: 8px 0px 0px 8px; background: #0a73bb; padding-left: 5px;"><?php echo Html::img('@web/img/shopping-cart.png', ['width' => '32px']) ?></div>
 <?php if(Yii::$app->user->identity->role == \app\models\User::CUSTOMER_ROLE): ?>
+<div class="show_cart" style="position:fixed; z-index: 9999; right: 0; cursor:pointer; top: 10%; width: 60px; border-radius: 8px 0px 0px 8px; background: #0a73bb; padding-left: 5px;"><?php echo Html::img('@web/img/shopping-cart.png', ['width' => '32px']) ?></div>
 <div class="products_basket_window" style="">
     <div class="col-12">
         <div class="hide_cart" style="float:right; z-index: 9999; cursor:pointer;margin: 20px;">
@@ -45,7 +45,7 @@ use yii\widgets\DetailView;
                         <?= Html::beginForm(['/order/remove-product']); ?>
                         <?= Html::hiddenInput('id', $cookieArr[$key]['id']); ?>
                         <?= Html::submitButton(
-                            Html::img('@web/img/remove.png', ['width' => '32px']),
+                            Html::img('@web/img/remove.png', ['width' => '16px']),
                             [
                                     'style' => ['background' => 'none','border'=>'none'],
                                 ]); ?>
@@ -60,10 +60,9 @@ use yii\widgets\DetailView;
         <div> Total sum: <?= $totalSum ?></div>
         <div>
             <?= Html::beginForm(['/order/create']); ?>
-            <?= Html::hiddenInput('total_sum', $totalSum);?>
             <?= Html::submitButton(
                 Html::img('@web/img/buy-button.png', ['width' => '80px']),
-                ['class' => 'nav-link btn btn-link logout']);?>
+                ['class' => 'btn btn-link']);?>
             <?= Html::endForm();?>
         </div>
     </div>

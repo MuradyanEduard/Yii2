@@ -6,8 +6,9 @@ use app\models\Book;
 use app\models\BookSearch;
 use app\models\Order;
 use app\models\OrderProduct;
-use app\models\OrderSearch;
+use app\models\User;
 use Yii;
+use yii\filters\AccessControl;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\filters\VerbFilter;
@@ -23,17 +24,37 @@ class OrderController extends Controller
      */
     public function behaviors()
     {
-        return array_merge(
-            parent::behaviors(),
-            [
-                'verbs' => [
-                    'class' => VerbFilter::className(),
-                    'actions' => [
-                        'delete' => ['POST'],
-                    ],
+        $behaviors['verbs'] = [
+            'class' => VerbFilter::class,
+            'actions' => [
+                'delete' => ['POST'],
+            ],
+        ];
+        $behaviors['access'] = [
+            'class' => AccessControl::class,
+            'only' => ['index', 'create', 'add-product', 'remove-product', 'view'],
+            'rules' => [
+                [
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'actions' => ['index'],
                 ],
-            ]
-        );
+                [
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'actions' => ['add-product', 'remove-product', 'create'],
+                    'matchCallback' => function ($rule, $action) {
+                        if (Yii::$app->user->getIdentity()->role == User::USER_ROLE)
+                            return false;
+
+                        return true;
+                    }
+                ]
+            ],
+
+        ];
+
+        return $behaviors;
     }
 
     /**
@@ -41,38 +62,30 @@ class OrderController extends Controller
      *
      * @return string
      */
+
+
     public function actionIndex()
     {
-        if (Yii::$app->user->identity->role == \app\models\User::USER_ROLE) {
-            $searchModel = new BookSearch();
-            $dataProvider = $searchModel->searchByAuthorId($this->request->queryParams, Yii::$app->user->identity->id);
-
-            return $this->render('index', [
-                'searchModel' => $searchModel,
-                'dataProvider' => $dataProvider,
-            ]);
-        } else {
-            $searchModel = new OrderSearch();
-            $dataProvider = $searchModel->search($this->request->queryParams);
-
-            return $this->render('index', [
-                'searchModel' => $searchModel,
-                'dataProvider' => $dataProvider,
-            ]);
+        switch (Yii::$app->user->identity->role) {
+            case User::ADMIN_ROLE:
+                $searchModel = new Order();
+                $dataProvider = $searchModel->search($this->request->queryParams);
+                break;
+            case User::USER_ROLE:
+                $searchModel = new BookSearch();
+                $dataProvider = $searchModel->searchByAuthorId($this->request->queryParams, Yii::$app->user->identity->id);
+                break;
+            case  User::CUSTOMER_ROLE:
+                $searchModel = new Order();
+                $dataProvider = $searchModel->searchByUserId($this->request->queryParams, Yii::$app->user->identity->id);
+                break;
         }
-    }
 
-    /**
-     * Displays a single Order model.
-     * @param int $id ID
-     * @return string
-     * @throws NotFoundHttpException if the model cannot be found
-     */
-    public function actionView($id)
-    {
-        return $this->render('view', [
-            'model' => $this->findModel($id),
+        return $this->render('index', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
         ]);
+
     }
 
     /**
@@ -82,42 +95,58 @@ class OrderController extends Controller
      */
     public function actionCreate()
     {
+        if (!Yii::$app->getRequest()->getCookies()->has('products') ||
+            (Yii::$app->getRequest()->getCookies()->getValue('products') == []))
+            return $this->redirect('/book');
+
         if ($this->request->isPost) {
+
             $order = new Order();
-            $order->total_sum = $this->request->post()['total_sum'];
-            $order->user_id = Yii::$app->user->identity->id;
+            $order->load([
+                'Order' => [
+                    'user_id' => Yii::$app->user->identity->id,
+                    'total_sum' => 0
+                ]
+            ]);
             $order->save();
 
-            $cookieArr = [];
+            $total_sum = 0;
+            $productIds = Yii::$app->getRequest()->getCookies()->getValue('products');
 
-            if (Yii::$app->getRequest()->getCookies()->has('products')) {
-                $cookieArr = Yii::$app->getRequest()->getCookies()->getValue('products');
-            }
+            foreach ($productIds as $productId) {
 
-            foreach ($cookieArr as $key => $cookie) {
-                $book = Book::findOne($cookie['id']);
+                $book = Book::findOne($productId['id']);
+                $count = intval($book->count < $productId['count'] ? $book->count : $productId['count']);
 
-                $product = new OrderProduct();
-                $product->order_id = $order->id;
-                $product->book_id = $cookie['id'];
-                $product->count = $cookie['count'];
-                $product->price = $book->price * $cookie['count'];
-                $product->save();
-                $book->count -= intval($cookie['count']);
+                $orderProduct = new OrderProduct();
+                $orderProduct->load([
+                    'OrderProduct' => [
+                        'order_id' => $order->id,
+                        'book_id' => $productId['id'],
+                        'count' => $count,
+                        'price' => $book->price * $count
+                    ]
+                ]);
 
-                if ($book->count < 0)
-                    $book->count = 0;
+                if ($orderProduct->validate()) {
+                    $orderProduct->save();
 
-                $book->authorsArr = [''];
-                $book->save();
+                    $total_sum = $total_sum + ($count * $book->price);
+                    $book->count -= $count;
+                    $book->authorsArr = [''];
+                    $book->save();
+                }
+
             }
 
             $cookie = new \yii\web\Cookie([
                 'name' => 'products',
                 'value' => [],
             ]);
-
             Yii::$app->getResponse()->getCookies()->add($cookie);
+
+            $order->total_sum = $total_sum;
+            $order->save();
         }
 
         return $this->redirect('/book');
@@ -142,50 +171,34 @@ class OrderController extends Controller
 
     public function actionAddProduct()
     {
-        $model = new Book();
-        $model->load($this->request->post());
-        $book = Book::findOne($model->id);
+        $newBook = new Book();
+        $newBook->load($this->request->post());
+        $book = Book::findOne($newBook->id);
 
-        $cookieArr = [];
+        $products = [];
 
         if (Yii::$app->getRequest()->getCookies()->has('products')) {
-            $cookieArr = Yii::$app->getRequest()->getCookies()->getValue('products');
+            $products = Yii::$app->getRequest()->getCookies()->getValue('products');
         }
 
-        $cond = false;
-
-        foreach ($cookieArr as $key => $cookie) {
-            if ($model->id == $cookie['id']) {
-                $cond = true;
-
-                if ($book->count <= ($cookie['count'] + $model->count)) {
-                    $cookieArr[$key]['count'] = $book->count;
-                } else {
-                    $cookieArr[$key]['count'] = $cookie['count'] + $model->count;
-                }
-
+        for ($i = 0; $i < count($products); $i++) {
+            if ($newBook->id == $products[$i]['id']) {
+                $products[$i]['count'] = ($book->count < ($products[$i]['count'] + $newBook->count)) ?
+                    ($book->count) : ($products[$i]['count'] + $newBook->count);
                 break;
             }
         }
 
-        if (!$cond) {
-            if ($book->count <= ($model->count)) {
-                array_push($cookieArr, [
-                    'id' => $model->id,
-                    'count' => ($book->count)
-                ]);
-            } else {
-                array_push($cookieArr, [
-                    'id' => $model->id,
-                    'count' => ($model->count)
-                ]);
-            }
-
+        if ($i == count($products)) {
+            array_push($products, [
+                'id' => $newBook->id,
+                'count' => ($book->count < $newBook->count) ? ($book->count) : ($newBook->count)
+            ]);
         }
 
         $cookie = new \yii\web\Cookie([
             'name' => 'products',
-            'value' => $cookieArr,
+            'value' => $products,
         ]);
 
         Yii::$app->getResponse()->getCookies()->add($cookie);
@@ -195,21 +208,21 @@ class OrderController extends Controller
     public function actionRemoveProduct()
     {
         $id = $this->request->post()['id'];
-        $cookieArr = [];
+        $products = [];
 
         if (Yii::$app->getRequest()->getCookies()->has('products')) {
-            $cookieArr = Yii::$app->getRequest()->getCookies()->getValue('products');
+            $products = Yii::$app->getRequest()->getCookies()->getValue('products');
         }
 
-        foreach ($cookieArr as $key => $cookie) {
-            if ($id == $cookie['id']) {
-                unset($cookieArr[$key]);
+        foreach ($products as $key => $product) {
+            if ($id == $product['id']) {
+                unset($products[$key]);
             }
         }
 
         $cookie = new \yii\web\Cookie([
             'name' => 'products',
-            'value' => $cookieArr,
+            'value' => $products,
         ]);
 
         Yii::$app->getResponse()->getCookies()->add($cookie);

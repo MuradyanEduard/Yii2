@@ -40,6 +40,7 @@ $this->params['breadcrumbs'][] = $this->title;
 <?php \app\widgets\AuthorList::begin(['book' => $model]) ?>
 <?php \app\widgets\AuthorList::end() ?>
 
+<?php if(Yii::$app->user->identity->role == \app\models\User::CUSTOMER_ROLE): ?>
 <div class="form-group">
     <?php $form = ActiveForm::begin(['action' => 'order/add', 'method' => 'post']); ?>
     <?= $form->field($model, 'id')->hiddenInput(['maxlength' => true])->label('') ?>
@@ -47,4 +48,5 @@ $this->params['breadcrumbs'][] = $this->title;
     <?= Html::submitButton('Add Product', ['class' => 'btn btn-success']) ?>
     <?php ActiveForm::end(); ?>
 </div>
+<?php endIf ?>
 

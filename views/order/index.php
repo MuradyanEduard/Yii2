@@ -45,6 +45,7 @@ $this->params['breadcrumbs'][] = $this->title;
                             $products[] = $product->book->name;
                             $products[] = $product->count;
                             $products[] = $product->book->price;
+                            $products[] = '<br>';
                         }
                         $products = implode(" ", $products);
                         return $products;
@@ -71,7 +72,6 @@ $this->params['breadcrumbs'][] = $this->title;
                     'label' => 'Count Customer',
                     'format' => 'text',
                     'content' => function ($data) {
-                        // dd($data->products->order);
                         $products = [];
                         $total_sum = 0;
                         foreach ($data->products as $product) {
