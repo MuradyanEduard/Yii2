@@ -32,9 +32,6 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
         ]) ?>
 
-        <p>
-            <?= Html::a('Add Product', ['Add/Product'], ['class' => 'btn btn-success']) ?>
-        </p>
     </div>
 
 </div>

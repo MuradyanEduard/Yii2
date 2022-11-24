@@ -6,6 +6,7 @@ use app\models\Book;
 use app\models\BookSearch;
 use app\models\Order;
 use app\models\OrderProduct;
+use app\models\OrderSearch;
 use app\models\User;
 use Yii;
 use yii\filters\AccessControl;
@@ -32,7 +33,7 @@ class OrderController extends Controller
         ];
         $behaviors['access'] = [
             'class' => AccessControl::class,
-            'only' => ['index', 'create', 'add-product', 'remove-product', 'view'],
+            'only' => ['index', 'create', 'add-product', 'remove-product', 'view','user','admin','customer'],
             'rules' => [
                 [
                     'allow' => true,
@@ -49,6 +50,39 @@ class OrderController extends Controller
 
                         return true;
                     }
+                ],
+                [
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'actions' => ['user'],
+                    'matchCallback' => function ($rule, $action) {
+                        if (Yii::$app->user->getIdentity()->role == User::USER_ROLE)
+                            return true;
+
+                        return false;
+                    }
+                ],
+                [
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'actions' => ['admin'],
+                    'matchCallback' => function ($rule, $action) {
+                        if (Yii::$app->user->getIdentity()->role == User::ADMIN_ROLE)
+                            return true;
+
+                        return false;
+                    }
+                ],
+                [
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'actions' => ['customer'],
+                    'matchCallback' => function ($rule, $action) {
+                        if (Yii::$app->user->getIdentity()->role == User::CUSTOMER_ROLE)
+                            return true;
+
+                        return false;
+                    }
                 ]
             ],
 
@@ -63,29 +97,37 @@ class OrderController extends Controller
      * @return string
      */
 
-
-    public function actionIndex()
+    public function actionAdmin()
     {
-        switch (Yii::$app->user->identity->role) {
-            case User::ADMIN_ROLE:
-                $searchModel = new Order();
-                $dataProvider = $searchModel->search($this->request->queryParams);
-                break;
-            case User::USER_ROLE:
-                $searchModel = new BookSearch();
-                $dataProvider = $searchModel->searchByAuthorId($this->request->queryParams, Yii::$app->user->identity->id);
-                break;
-            case  User::CUSTOMER_ROLE:
-                $searchModel = new Order();
-                $dataProvider = $searchModel->searchByUserId($this->request->queryParams, Yii::$app->user->identity->id);
-                break;
-        }
+        $searchModel = new OrderSearch();
+        $dataProvider = $searchModel->search($this->request->queryParams);
 
         return $this->render('index', [
             'searchModel' => $searchModel,
             'dataProvider' => $dataProvider,
         ]);
+    }
 
+    public function actionUser()
+    {
+        $searchModel = new BookSearch();
+        $dataProvider = $searchModel->searchByAuthorId($this->request->queryParams, Yii::$app->user->identity->id);
+
+        return $this->render('index', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
+        ]);
+    }
+
+    public function actionCustomer()
+    {
+        $searchModel = new OrderSearch();
+        $dataProvider = $searchModel->searchByUserId($this->request->queryParams, Yii::$app->user->identity->id);
+
+        return $this->render('index', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
+        ]);
     }
 
     /**

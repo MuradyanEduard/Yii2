@@ -10,7 +10,7 @@ $config = [
     'defaultRoute' => 'auth',
     'aliases' => [
         '@bower' => '@vendor/bower-asset',
-        '@npm'   => '@vendor/npm-asset',
+        '@npm' => '@vendor/npm-asset',
     ],
     'container' => [
         'definitions' => [
@@ -22,6 +22,10 @@ $config = [
         'request' => [
             // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
             'cookieValidationKey' => '6FlzESRtRHQLujfSAA8G60KoAPqNAHn4',
+
+//            'parsers' => [
+//                'application/json' => 'yii\web\JsonParser'
+//            ]
         ],
         'cache' => [
             'class' => 'yii\caching\FileCache',
@@ -52,18 +56,28 @@ $config = [
         'db' => $db,
         'urlManager' => [
             'enablePrettyUrl' => true,
+            'enableStrictParsing' => true,
             'showScriptName' => false,
+
             'rules' => [
+//                ['class' => 'yii\rest\UrlRule','controller' => 'author'],
+//                ['class' => 'yii\rest\UrlRule','controller' => 'book'],
                 '/' => 'auth/login',
+                '/auth/logout' => 'auth/logout',
                 '/signup' => 'auth/signup',
                 '/book' => 'book/index',
                 '/book/create' => 'book/create',
+                '/book/view' => 'book/view',
                 '/author' => 'author/index',
                 '/author/create' => 'author/create',
+                '/author/view' => 'author/view',
+                '/order' => 'order-view/index',
+                '/order/admin' => 'order/admin',
+                '/order/customer' => 'order/customer',
+                '/order/user' => 'order/user',
                 '/book/order/add' => 'order/add-product',
                 '/book/order/remove' => 'order/add-remove',
                 '/book/order/create' => 'order/create',
-                '/order' => 'order/index',
             ],
         ],
 

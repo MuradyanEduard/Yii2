@@ -77,6 +77,7 @@ class AuthController extends Controller
      */
     public function actionLogout()
     {
+
         Yii::$app->user->logout();
 
         $cookie = new \yii\web\Cookie([
